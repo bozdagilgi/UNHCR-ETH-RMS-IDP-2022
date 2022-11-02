@@ -1,0 +1,253 @@
+###Install Packages
+
+
+rm(list = ls())
+
+
+library(haven)
+library(tidyverse)
+library(readxl)
+library(srvyr)
+library(ggplot2)
+library(robotoolbox)
+library(labelled)
+library(remotes)
+library(dm)
+
+
+
+####ETH datasets (IDP) # USE WEIGHTS
+
+####Half of the sample is drawn form sampling frame and the other half is respondent driven smpling
+#### Weights of 1 is given to the half with no sampling weights (non-RDS)
+
+
+
+main_ETH <- read_dta("C:/Users/BOZDAG/OneDrive - UNHCR/Desktop/UNHCR/RBM/Tango datasets/Final Tango/UNHCR_ETH_RAS_IDP_HH_IND_RDS_SF_10142022/UNHCR_ETH_IDP_HH_RDS_SF_10142022.dta")
+
+ind_ETH <- read_dta("C:/Users/BOZDAG/OneDrive - UNHCR/Desktop/UNHCR/RBM/Tango datasets/Final Tango/UNHCR_ETH_RAS_IDP_HH_IND_RDS_SF_10142022/UNHCR_ETH_IDP_IND_RDS_SF_10142022.dta")
+view(ind_ETH)
+view(main_ETH)
+
+
+table(main_ETH$POP_GROUPS) ###690 IDPs
+
+
+###Calculate age groups for disaggregation for ind and main dataset
+
+###Turn into numeric
+
+ind_ETH$R03 <- as.numeric(ind_ETH$R03)
+
+ind_ETH$HH07_cat <- cut(ind_ETH$R03 , 
+                        breaks = c(-1, 4, 17, 59, Inf),
+                        labels = c("0-4", "5-17", "18-59", "60+"))
+ind_ETH$HH07_cat2 <- cut(ind_ETH$R03 , 
+                         breaks = c(-1, 17, Inf),
+                         labels = c("0-17", "18-60+"))
+table(ind_ETH$HH07_cat)
+table(ind_ETH$HH07_cat2)
+
+###Label gender variable for individuals
+
+
+table(ind_ETH$R02)
+
+ind_ETH <- ind_ETH %>%
+  mutate(R02=labelled(R02,
+                      labels=c(
+                        "Male"=1,
+                        "Female"=2,
+                        "Other"=3
+                      ),
+                      label="Gender")) 
+
+
+###Calculate citizenship
+
+table(ind_ETH$REF01)
+
+ind_ETH <- ind_ETH %>%
+  mutate(citizenship=case_when(
+    REF01==1 ~ 'ETH')
+  )
+
+table((ind_ETH$citizenship))
+
+
+
+###MISSING VALUES
+
+####Calculate disability ####NA values also turn 0 --> it Was only asked to above 18 
+
+
+ind_ETH$DIS01<- as.numeric(ind_ETH$DIS01)
+ind_ETH$DIS02<- as.numeric(ind_ETH$DIS02)
+ind_ETH$DIS03<- as.numeric(ind_ETH$DIS03)
+ind_ETH$DIS04<- as.numeric(ind_ETH$DIS04)
+ind_ETH$DIS05<- as.numeric(ind_ETH$DIS05)
+ind_ETH$DIS06<- as.numeric(ind_ETH$DIS06)
+
+ind_ETH <-  ind_ETH %>%
+  mutate( # disability identifier variables according to Washington Group standards
+    disaux1_234 = DIS01 %in% c("2","3","4"), # indicator variables for all 6 domains with value TRUE if SOME DIFFICULTY or A LOT OF DIFFICULTY or CANNOT DO AT ALL
+    disaux2_234 = DIS02 %in% c("2","3","4"),
+    disaux3_234 = DIS03 %in% c("2","3","4"),
+    disaux4_234 = DIS04 %in% c("2","3","4"),
+    disaux5_234 = DIS05 %in% c("2","3","4"),
+    disaux6_234 = DIS06 %in% c("2","3","4"),
+    
+    disaux1_34 = DIS01 %in% c("3","4"), # indicator variables for all 6 domains with value TRUE if A LOT OF DIFFICULTY or CANNOT DO AT ALL
+    disaux2_34 = DIS02 %in% c("3","4"),
+    disaux3_34 = DIS03 %in% c("3","4"),
+    disaux4_34 = DIS04 %in% c("3","4"),
+    disaux5_34 = DIS05 %in% c("3","4"),
+    disaux6_34 = DIS06 %in% c("3","4")
+  ) %>%
+  mutate(
+    disSum234 = rowSums(select(., disaux1_234, disaux2_234 , disaux3_234 , disaux4_234 , disaux5_234 , disaux6_234)), # count number of TRUE indicator variables over 6 domains
+    disSum34 = rowSums(select(., disaux1_34, disaux2_34 , disaux3_34 , disaux4_34 , disaux5_34 , disaux6_34)) # count number of TRUE indicator variables over 6 domains
+    
+  ) %>%
+  mutate(
+    DISABILITY1 = case_when( # : the level of inclusion is at least one domain/question is coded SOME DIFFICULTY or A LOT OF DIFFICULTY or CANNOT DO AT ALL.
+      disSum234 >= 1 ~ 1,
+      disSum234 == 0 & (!(DIS01 %in% c("98","99") & DIS02 %in% c("98","99") & DIS03 %in% c("98","99") & DIS04 %in% c("98","99") & DIS05 %in% c("98","99") & DIS06 %in% c("98","99"))) ~ 0,
+      DIS01 %in% c("98","99") & DIS02 %in% c("98","99") & DIS03 %in% c("98","99") & DIS04 %in% c("98","99") & DIS05 %in% c("98","99") & DIS06 %in% c("98","99") ~ 98
+    )
+  ) %>%
+  mutate(
+    DISABILITY2 = case_when( # : the level of inclusion is at least two domains/questions are coded SOME DIFFICULTY or A LOT OF DIFFICULTY or CANNOT DO AT ALL or any 1 domain/question is coded A LOT OF DIFFICULTY or CANNOT DO AT ALL
+      disSum234 >= 2 | disSum34 >=1  ~ 1,
+      disSum234 < 2 & disSum34 == 0 & (!(DIS01 %in% c("98","99") & DIS02 %in% c("98","99") & DIS03 %in% c("98","99") & DIS04 %in% c("98","99") & DIS05 %in% c("98","99") & DIS06 %in% c("98","99"))) ~ 0,
+      DIS01 %in% c("98","99") & DIS02 %in% c("98","99") & DIS03 %in% c("98","99") & DIS04 %in% c("98","99") & DIS05 %in% c("98","99") & DIS06 %in% c("98","99") ~ 98
+    )
+  ) %>%
+  mutate(
+    DISABILITY3 = case_when( # : the level of inclusion is at least one domain/question is coded A LOT OF DIFFICULTY or CANNOT DO AT ALL.
+      disSum34 >= 1 ~ 1,
+      disSum34 == 0 & (!(DIS01 %in% c("98","99") & DIS02 %in% c("98","99") & DIS03 %in% c("98","99") & DIS04 %in% c("98","99") & DIS05 %in% c("98","99") & DIS06 %in% c("98","99"))) ~ 0,
+      DIS01 %in% c("98","99") & DIS02 %in% c("98","99") & DIS03 %in% c("98","99") & DIS04 %in% c("98","99") & DIS05 %in% c("98","99") & DIS06 %in% c("98","99") ~ 98
+    )
+  ) %>%
+  mutate(
+    DISABILITY4 = case_when( # : the level of inclusion is at least one domain/question is coded CANNOT DO AT ALL.
+      DIS01=="4" | DIS02=="4" | DIS03=="4" | DIS04=="4" | DIS05=="4" | DIS06=="4" ~ 1,
+      !(DIS01=="4" | DIS02=="4" | DIS03=="4" | DIS04=="4" | DIS05=="4" | DIS06=="4") & (!(DIS01 %in% c("98","99") & DIS02 %in% c("98","99") & DIS03 %in% c("98","99") & DIS04 %in% c("98","99") & DIS05 %in% c("98","99") & DIS06 %in% c("98","99"))) ~ 0,
+      DIS01 %in% c("98","99") & DIS02 %in% c("98","99") & DIS03 %in% c("98","99") & DIS04 %in% c("98","99") & DIS05 %in% c("98","99") & DIS06 %in% c("98","99") ~ 98
+    )
+  ) %>%
+  mutate(
+    DISABILITY1 = labelled(DISABILITY1,
+                           labels = c(
+                             "Without disability" = 0,
+                             "With disability" = 1,
+                             "Unknown" = 98
+                           ),
+                           label = "Washington Group disability identifier 1"),
+    DISABILITY2 = labelled(DISABILITY2,
+                           labels = c(
+                             "Without disability" = 0,
+                             "With disability" = 1,
+                             "Unknown" = 98
+                           ),
+                           label = "Washington Group disability identifier 2"),
+    DISABILITY3 = labelled(DISABILITY3,
+                           labels = c(
+                             "Without disability" = 0,
+                             "With disability" = 1,
+                             "Unknown" = 98
+                           ),
+                           label = "Washington Group disability identifier 3"),
+    DISABILITY4 = labelled(DISABILITY4,
+                           labels = c(
+                             "Without disability" = 0,
+                             "With disability" = 1,
+                             "Unknown" = 98
+                           ),
+                           label = "Washington Group disability identifier 4"))
+###Calculate having at least one disability identifier among 4 categories 
+ind_ETH<- ind_ETH %>%
+  mutate(disab=
+           case_when(DISABILITY1==1 | DISABILITY2==1 | DISABILITY3==1 | DISABILITY4==1 ~ 1, 
+                     DISABILITY1==0 | DISABILITY2==0 | DISABILITY3==0 | DISABILITY4==0 ~ 0,
+                     TRUE ~ NA_real_)
+  ) %>%
+  mutate(disab = labelled(disab,
+                          labels = c(
+                            "Without disability" = 0,
+                            "With disability" = 1)
+  ))
+
+table(ind_ETH$disab)
+
+
+
+###Note: one variable dropped while merging/ issue not detected --- 689 variables 
+
+####Problem non-resolved- check later.
+
+####Use weights : HH_WGT
+
+
+####TRIM EXTREME WEIGHTS FROM RDS
+
+
+###Resource: http://www.asasrms.org/Proceedings/y2015/files/234115.pdf
+
+install_github("pewresearch/pewmethods", build_vignettes = TRUE)
+
+
+###Resource for trimming
+
+library(pewmethods)
+calculate_deff(main_ETH$HH_WGT)
+
+main_ETH <- main_ETH %>%
+  mutate(weight2_trimmed = trim_weights(HH_WGT, 
+                                        lower_quantile = 0.05, 
+                                        upper_quantile = 0.95))
+
+view(main_ETH$weight2_trimmed)
+
+calculate_deff(main_ETH$weight2_trimmed)
+
+get_totals("KEBELE", main_ETH, 
+             wt = c("HH_WGT", "weight2_trimmed"), 
+             digits = 1)
+
+#####Merge individual datasets
+
+###Create similar variable names for merging with the individual dataset ( FOR RANDOMLY SELECTED ADULT DEMO)
+
+main_ETH$R01 <- main_ETH$SAMPLED_ADULT
+
+
+####Create identical variables to merge with kobo key index
+
+##Warning: do not use HHid - DOES NOT MATCH
+
+table(ind_ETH$key)
+table(main_ETH$key)
+
+ind_ETH$key <- ind_ETH$"___parent_index"
+main_ETH$key <- main_ETH$"___index"
+
+
+
+## Import HH level variables from individual dataset
+
+main_m <- main_ETH %>%
+  select("key", "POP_GROUPS","HM_COUNT", "HH_WGT", "weight2_trimmed") ## ADD VARIABLES FOR MERGING from main dataset
+
+ind_ETH <- merge(main_m, ind_ETH, by = "key")
+
+rm(main_m)
+
+##Select indicators for merge
+
+ind_m <- ind_ETH %>%
+  select("key", "HH07_cat", "disab", "HH07_cat2", "citizenship","R01", "R02", "R03") ##ADD VARIABLES FOR MERGING
+main_ETH <- merge(ind_m, main_ETH, by=c("R01", "key"))
+
+rm(ind_m)
