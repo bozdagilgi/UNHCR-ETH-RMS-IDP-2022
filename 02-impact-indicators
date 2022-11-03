@@ -1,0 +1,215 @@
+#####ETH RBM Indicator Calculations for RAS
+
+####IMPACT INDICATORS
+
+#####2.2.Proportion of PoCs residing in physically safe and secure settlements with access to basic facilities
+
+#####Step 1. Shelter calculations for 2.2 impact indicator
+
+
+###cHECK FOR 2.2 AS THE RESULT IS 0
+
+
+
+##classify DWE01 as 1 when it has decent quality/improved 
+
+main_ETH <- main_ETH %>%
+  mutate(dwe01_cat=case_when( #Only apartment and house
+    (DWE01==1 | DWE01==2) ~ 1, TRUE ~ 0 )
+  ) %>%
+  mutate(dwe04_cat=case_when( #unimproved floor when earth,sand,clay,mud, dung or other
+    (DWE04==1 | DWE04==2 | DWE04==6) ~ 0, TRUE ~ 1 )
+  ) %>%
+  mutate(dwe03_cat=case_when( #unimproved roof all options except metal,wood,ceramic tiles, cement, roofing shingles/sheets
+    (DWE03==2 |DWE03==3 | DWE03==4 | DWE03==6 |
+       DWE03==8 | DWE03==9 ) ~ 1 , TRUE ~ 0)
+  ) %>%
+  mutate(dwe02_cat=case_when( #improved wall: cement,stone,bricks,cement blocks, covered adobe, wood planks
+    (DWE02==2| DWE02==3|DWE02==4 | DWE02==5 | DWE02==6 ) ~ 1,
+    TRUE ~ 0)
+  ) 
+
+table(main_ETH$dwe01_cat)
+table(main_ETH$dwe02_cat)
+table(main_ETH$dwe03_cat)
+table(main_ETH$dwe04_cat)
+
+####Calculate crowding index
+
+main_ETH$HM_COUNT <- as.numeric(main_ETH$HM_COUNT)
+
+
+table(main_ETH$crowding)
+table(main_ETH$dwe05_cat)
+view(main_ETH$crowding)
+
+view(main_ETH$DWE05A)
+
+
+
+###uSE dwe05a for crowding calculation ()
+
+main_ETH <- main_ETH %>%
+  mutate(dwe05_cat=case_when( ##if crowding <= 3 
+    DWE05A <= 3 ~ 1, TRUE ~ 0)
+  )
+
+table(main_ETH$dwe05_cat)
+
+####Combine all shelter indicators 
+
+##dwe01_cat / dwe02_cat / dwe03_cat / dwe04_cat / dwe05_cat 
+
+
+main_ETH <- main_ETH  %>%
+  
+  mutate(shelter=case_when(
+    dwe01_cat==0 | dwe02_cat==0 | dwe03_cat==0 | dwe04_cat==0 | dwe05_cat==0   ~ 0, 
+    dwe01_cat==1 & dwe02_cat==1 & dwe03_cat==1 & dwe04_cat==1 & dwe05_cat==1  ~ 1)
+  ) %>%
+  mutate( shelter = labelled(shelter,
+                             labels = c(
+                               "Yes" = 1,
+                               "No" = 0
+                             ),
+                             label = "Habitable and affordable shelter"))
+
+table(main_ETH$shelter)
+
+
+#Step2. calculate percentage of PoC having access to clean fuel for lighting and / or basic connectivity (9.1)
+###for LIGHT02 Only include options based on metadata (exclude diesel generator, candles, kerosene)
+
+
+main_ETH <- main_ETH %>% 
+  mutate(electricity=
+           case_when(LIGHT01==1 & (LIGHT02==1 |LIGHT02==3 | LIGHT02==5 | LIGHT02==6 
+                                   | LIGHT02==7 ) & 
+                       (LIGHT03!=0 | LIGHT03!=96 | LIGHT03!=98 ) ~ 1,
+                     TRUE ~ 0)
+  ) %>%
+  mutate( electricity = labelled(electricity,
+                                 labels = c(
+                                   "Yes" = 1,
+                                   "No" = 0
+                                 ),
+                                 label = "Access to electricity"))
+
+
+table(main_ETH$electricity)
+
+#Step3. calculate percentage of PoCs using at least basic water services (12.2)
+###Improved drinking water resource that is accessible under 30 minutes in the last 30 days
+
+
+main_ETH <- main_ETH %>%
+  
+  mutate(time_DWA=case_when(
+    DWA03A==1~1, DWA03B==2~60)
+  ) %>%
+  mutate(time_tot=time_DWA*DWA03B
+  ) %>%
+  mutate(dwa_cond1=case_when( time_tot > 30 ~ 0, TRUE ~ 1) ##Accessible under 30 minutes
+  ) %>%
+  mutate(dwa_cond2=case_when(DWA01!=7 |DWA01!=9 |DWA01!= 13 | DWA01 != 96 |DWA01 !=98 ~ 1,
+                             TRUE ~ 0) ## protected source
+  ) %>%
+  mutate(dwa_cond3=case_when(DWA04==1 ~ 0, TRUE ~ 1) ## drinking water was available in the last 30 days
+  ) %>%
+  mutate(drinkingwater=case_when(
+    (dwa_cond1==1 & dwa_cond2==1 & dwa_cond3==1) ~ 1, TRUE ~ 0)
+  ) %>%
+  mutate(drinkingwater = labelled(drinkingwater,
+                                  labels = c(
+                                    "Yes" = 1,
+                                    "No" = 0
+                                  ),
+                                  label = "Access to drinking water"))
+
+
+##Step4. Calculate access to health facilities -according to Sphere standards- it should be reachable within 1 hour 
+
+####Access to health facility: If respondent knows where to reach within 1 hour distance (any type of transport)
+
+
+main_ETH <- main_ETH %>%
+  mutate(health_acc=
+           case_when(HEA01!=98 & HEA03 <= 60 ~ 1,
+                     TRUE ~ 0)
+  ) %>%
+  mutate( health_acc = labelled(health_acc,
+                                labels = c(
+                                  "Health facility is available" = 1,
+                                  "Health facilitiy is not available" = 0
+                                ),
+                                label = "Access to health facilities"))
+
+###Step5. Calculate impact indicator based on shelter, electricity, drinkingwater and health_acc
+
+main_ETH <-main_ETH %>%
+  
+  mutate(impact2_2=case_when(
+    shelter==0 | electricity==0 | drinkingwater==0 | health_acc==0 ~ 0,
+    shelter==1 & electricity==1 & drinkingwater==1 & health_acc==1 ~ 1)
+  ) %>% 
+  mutate(impact2_2=labelled(impact2_2,
+                            labels =c(
+                              "Yes"=1,
+                              "No"=0
+                            ),
+                            label="PoCs residing in physically safe and secure settlements with access to basic facilities"))
+
+table(main_ETH$impact2_2)
+
+###2.3 Proportion of PoC with access to health services -- calculated for the last 3 months for SA dataset
+##Module :HACC01 - HACC04
+
+########Individual level indicator asked to the respondent only for SA
+
+
+#Calculate those who were not able to access due to reasons unrelated to asked services (when HACC04 is 7/8/96)
+
+main_ETH <- main_ETH %>%
+  
+  mutate(health_NOacc=case_when(
+    HACC03==1 & (HACC047==1 | HACC048==1 | HACC0496==1 ) ~ 0,
+    HACC03==1 & (HACC041==1 | HACC042==1 | HACC043==1 |HACC044==1 |HACC045==1 |
+                   HACC046==1 | HACC049==1 ) ~ 1, TRUE ~ 0) # THOSE WHO DID NOT ACCESS EXCLUDING SOME REASONS
+  ) %>% ## Those who needed services
+  mutate(HACC01_m=case_when(HACC01==2 ~ 0, HACC01==1 ~ 1) 
+  ) %>%
+  mutate(HACC_need=HACC01_m + health_NOacc
+  ) %>%
+  mutate(impact2_3=case_when(
+    HACC_need>0 & health_NOacc==0 ~ 1,
+    HACC_need>0 & health_NOacc==1 ~ 0,
+    TRUE ~ NA_real_)
+  ) %>%
+  mutate(impact2_3=labelled(impact2_3,
+                            labels =c(
+                              "Yes"=1,
+                              "No"=0
+                            ),
+                            label="PoC has access to health services in the last 3 months when needed"))
+
+table(main_ETH$impact2_3)
+
+##3.3 Proportion of PoC feeling safe walking alone in their neighborhood
+##Module :SAF01
+
+
+#if unsafe or very unsafe 0 - if don't know - 98 include, refusals will go into missing
+
+main_ETH <- main_ETH %>%
+  mutate(impact3_3=case_when(
+    SAF01==1 | SAF01==2 ~ 1,
+    SAF01==3 | SAF01==4 | SAF01==98 ~ 0, SAF01==99 | SAF01==97~ NA_real_)
+  ) %>% 
+  mutate(impact3_3=labelled(impact3_3,
+                            labels =c(
+                              "Yes"=1,
+                              "No"=0
+                            ),
+                            label="PoC feeling safe walking alone"))
+
+table(main_ETH$impact3_3)
