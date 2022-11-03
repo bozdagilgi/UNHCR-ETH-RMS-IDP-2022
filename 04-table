@@ -1,0 +1,55 @@
+##Create table for RBM indicators ETH RAS RMS 2022
+
+##Load packages
+
+install.packages('expss')
+install.packages("openxlsx")
+library(openxlsx)
+library(expss)
+
+###No weights are used for ETH RAS dataset
+
+RBM_ETHmain_IDPwoutweights = main_ETH %>% 
+  cross_cpct(
+    cell_vars = list(impact2_2, impact2_3, impact3_3, outcome16_1,
+                     outcome16_2, outcome4_1, outcome4_2, outcome8_2, outcome9_1,
+                     outcome9_2, outcome10_2, outcome12_1, outcome12_2,
+                     outcome13_1, outcome13_2, outcome13_3),
+    col_vars = list(total(), HH07_cat2, disab, R02 ,POP_GROUPS,  HH07_cat),
+    weight = NULL) %>% 
+  set_caption("RBM Indicators from household dataset")
+
+
+RBM_ETHind_IDPwoutweights=ind_ETH %>%
+  cross_cpct(
+    cell_vars = list(outcome1_2, outcome1_3, outcome5_2, outcome10_1),
+    col_vars = list(total(), HH07_cat2, disab, R02 ,POP_GROUPS,  HH07_cat),
+    weight = NULL) %>% 
+  set_caption("RBM Indicators from individual dataset")
+
+
+#### CHECK THE RESULTS WITH WEIGHTS 
+
+RBM_ETHmain_IDP = main_ETH %>% 
+  cross_cpct(
+    cell_vars = list(impact2_2, impact2_3, impact3_3, outcome16_1,
+                     outcome16_2, outcome4_1, outcome4_2, outcome8_2, outcome9_1,
+                     outcome9_2, outcome10_2, outcome12_1,  outcome12_2,
+                     outcome13_1, outcome13_2, outcome13_3),
+    col_vars = list(total(), HH07_cat2, disab, R02 ,POP_GROUPS,  HH07_cat),
+    weight = weight2_trimmed) %>% 
+  set_caption("RBM Indicators from household dataset")
+
+
+RBM_ETHind_IDP=ind_ETH %>%
+  cross_cpct(
+    cell_vars = list(outcome1_2, outcome1_3, outcome5_2, outcome10_1),
+    col_vars = list(total(), HH07_cat2, disab, R02 ,POP_GROUPS,  HH07_cat),
+    weight = weight2_trimmed) %>% 
+  set_caption("RBM Indicators from individual dataset")
+
+### EXPORT TO EXCEL
+
+
+write.xlsx(RBM_ETHmain_IDP, "main_RBM_ETH_IDP.xlsx", colNames = TRUE, rowNames=TRUE)
+write.xlsx(RBM_ETHind_IDP, "ind_RBM_ETH_IDP.xlsx", colNames = TRUE, rowNames=TRUE)
