@@ -1,0 +1,560 @@
+#####RMS 2022 Outcome Indicators 
+
+library(janitor)
+library(haven)
+library(tidyverse)
+library(readxl)
+library(srvyr)
+library(ggplot2)
+library(robotoolbox)
+library(labelled)
+library(remotes)
+library(dm)
+
+
+
+###1.2 Proportion of children <5 years whose birth have been registered with a civil authority
+##Module :REG03 - REG04
+
+
+##Calculate children who has a birth certificate
+
+ind_ETH<- ind_ETH %>%
+  mutate(birthCertificate=case_when(
+    REG02==2 | REG02==98  ~ 0, REG02==1 ~ 1, REG02==99 ~ NA_real_)
+  ) %>%
+  mutate(birthCertificate=labelled(birthCertificate,
+                                   labels=c(
+                                     'Yes'=1,
+                                     'No'=0
+                                   ),
+                                   label="Children under 5 with a birth certificate"))
+
+table(ind_ETH$birthCertificate)
+table(ind_ETH$birthRegistered)
+table(ind_ETH$REG02)
+##Calculate children who has been registered with civil authorities
+
+ind_ETH <- ind_ETH %>%
+  mutate(birthRegistered=case_when(
+    REG03==2 | REG03==98  ~ 0, REG03==1 ~ 1, REG03==99 ~NA_real_)
+  ) %>%
+  mutate(birthRegistered=labelled(birthRegistered,
+                                  labels=c(
+                                    'Yes'=1,
+                                    'No'=0
+                                  ),
+                                  label="Children under 5 birth registered with civil authorities"))
+
+table(ind_ETH$REG03)
+
+##Calculate outcome indicator 1.2 --- USE BOTH OPTIONS 
+
+
+ind_ETH <- ind_ETH %>%
+  mutate(outcome1_2=case_when(
+    (birthRegistered==1 | birthCertificate==1) & R03 <5 ~ 1,
+    (birthRegistered==0 & birthCertificate==0) & R03 <5 ~ 0)
+  ) %>%
+  mutate(outcome1_2=labelled(outcome1_2,
+                             labels=c(
+                               'Yes'=1,
+                               'No'=0
+                             ),
+                             label="Proportion of children under 5 birth registered with civil authorities"))
+
+table(ind_ETH$outcome1_2)
+###1.3 Proportion of PoC with legally recognized identity documents or credentials
+##Module :REG01 - REG02 - REG05 - REG06
+
+###Calculate having documents for children under 5
+
+#add birth certificate as additional document from REG03
+ind_ETH <- ind_ETH %>%
+  mutate(document_under5=case_when(
+    REG04A==1 | REG04F==1 | REG04G==1 | REG04C==1 | REG04E==1 |
+      birthCertificate==1 ~ 1, 
+    REG04A!=1 & REG04F!=1 & REG04G!=1 & REG04C!=1 & REG04E!=1 &
+      birthCertificate!=1 ~ 0,
+    TRUE ~ NA_real_
+  ))
+
+table(ind_ETH$document_under5)
+
+table(ind_ETH$REG04A)
+table(ind_ETH$REG04C)
+table(ind_ETH$REG04E)
+table(ind_ETH$REG04F)
+table(ind_ETH$REG04G)
+
+###Calculate having documents for above 5
+
+
+#add birth certificate as additional document from REG03
+
+ind_ETH <- ind_ETH %>%
+  mutate(document_above5=case_when(
+    REG01A==1 | REG01B==1 | REG01H==1 | REG01I==1 | REG01D==1 |
+      REG01E==1 |  REG01F==1  ~ 1, 
+    REG01A!=1 & REG01B!=1 & REG01H!=1 & REG01I!=1 & REG01D!=1 &
+      REG01E!=1 &  REG01F!=1 ~ 0,
+    TRUE ~ NA_real_) ##calculate outcome indicator by combining under 5 and above 5 responses
+  ) %>%
+  mutate(outcome1_3=case_when(
+    (document_above5==1 | document_under5==1) ~ 1,  
+    (document_above5==0 | document_under5==0) ~ 0)
+  ) %>%
+  mutate(outcome1_3=labelled(outcome1_3,
+                             labels=c(
+                               'Yes'=1,
+                               'No'=0
+                             ),
+                             label="PoCs with legally recognized documents"))
+
+table(ind_ETH$outcome1_3)
+
+table(ind_ETH$REG01A)
+table(ind_ETH$REG01B)
+table(ind_ETH$REG01H)
+table(ind_ETH$REG01I)
+table(ind_ETH$REG01D)
+table(ind_ETH$REG01E)
+table(ind_ETH$REG01F)
+
+
+###4.1 Proportion of PoC who know where to access available GBV services
+##Module :GBV01
+
+##Turn into numeric variables for services
+
+main_ETH <- main_ETH %>%
+  mutate(outcome4_1=case_when(
+    GBV01A==1 |  GBV01B==1 |  GBV01C==1 |  GBV01D==1 ~ 1,
+    TRUE ~ 0)
+  ) %>%
+  mutate(outcome4_1=labelled(outcome4_1,
+                             labels=c(
+                               'Yes'=1,
+                               "No"=0
+                             ),
+                             label="Poc who know where to access available GBV services"
+  ))
+table(main_ETH$outcome4_1)
+
+###4.2 Proportion of PoC who do not accept violence against women
+##Module :VAW01
+
+
+##If yes selected for any of the circumstances
+main_ETH <- main_ETH %>%
+  mutate(outcome4_2=case_when(
+    VAW01A==1 | VAW01B==1 |  VAW01C==1 |  VAW01D==1 | VAW01E==1 ~ 0,
+    (VAW01A==2 | VAW01A==99 ) & (VAW01B==2 | VAW01B==99 ) &
+      (VAW01C==2 | VAW01C==99 ) & (VAW01D==2 | VAW01D==99 ) & (VAW01E==2 | VAW01E==99 ) ~ 1,
+    TRUE ~ NA_real_)
+  ) %>%
+  mutate(outcome4_2=labelled(outcome4_2,
+                             labels=c(
+                               'Yes'=1,
+                               "No"=0
+                             ),
+                             label="Poc who do not accept violence against women"
+  ))
+table(main_ETH$outcome4_2)
+
+###5.2 Proportion of children who participate in community-based child protection programmes
+##Module :COMM01-COMM04
+
+#Children who attended at least 2 times, under adult supervision in a physically safe area
+
+ind_ETH <- ind_ETH %>%
+  mutate(outcome5_2=case_when(
+    (COMM01==1 & COMM02 >=2 & COMM03==1 & COMM04==1) ~ 1,
+    COMM01==2 | COMM02 < 2 | COMM03==2 | COMM03==98 |
+      COMM03==99 | COMM04==99 | COMM04==2 | COMM04==98 ~ 0, TRUE ~ NA_real_)
+  ) %>%
+  mutate(outcome5_2=labelled(outcome5_2,
+                             labels=c(
+                               'Yes'=1,
+                               "No"=0
+                             ),
+                             label="Poc of children who participate in community-based 
+                              child protection programmes"
+  ))
+
+
+table(ind_ETH$outcome5_2)
+table(ind_ETH$COMM01)
+table(ind_ETH$COMM02)
+table(ind_ETH$COMM03)
+table(ind_ETH$COMM04)
+
+###8.2 Proportion of PoC with primary reliance on clean (cooking) fuels and technology
+##Module :COOK01-COOK03
+
+###Based on MICS calculation : TC4.1
+
+
+main_ETH <- main_ETH %>%
+  mutate(
+    outcome8_2 = case_when(
+      COOK01 == 1 & (COOK03 %in% c("1", "2", "3", "4", "5") | (COOK03 %in% c("6", "96") & COOK04 %in% c("1", "2", "3", "22"))) ~ 1, # see https://mics.unicef.org/files?job=W1siZiIsIjIwMTcvMDIvMDMvMTYvMjcvMjUvNTk5L1BpY3RvcmlhbHNfV0hPX0hvdXNlaG9sZF9FbmVyZ3lfVXNlX0NhdGFsb2d1ZV9TZXB0ZW1iZXJfMjAxNl8ucGRmIl1d&sha=57b4a452fcc0ac88
+      COOK01 == 1 & (COOK03 %in% c("7", "8", "9", "10") | (COOK03 %in% c("6", "96") & !(COOK04 %in% c("1", "2", "3", "22")))) ~ 0,
+      COOK01 == 2 ~ NA_real_
+    )
+  ) %>%
+  mutate(
+    outcome8_2 = labelled(outcome8_2,
+                          labels = c(
+                            "No" = 0,
+                            "Yes" = 1
+                          ),
+                          label = "PoC with primary reliance on clean (cooking) fuels and technology"
+    )
+    
+  )
+
+table(main_ETH$outcome8_2)
+table(main_ETH$COOK01)
+table(main_ETH$COOK03)
+table(main_ETH$COOK04)
+
+
+###9.1 Proportion of PoC living in habitable and affordable housing
+##Module :DWE01-DWE05 & DWE08-DWE09 ##Affordability excluded for ETH as indicator does not let the computation
+
+main_ETH <- main_ETH %>%
+  
+  mutate(dwe01_cat=case_when( #Only apartment and house
+    (DWE01==1 | DWE01==2) ~ 1, TRUE ~ 0 )
+  ) %>%
+  mutate(dwe04_cat=case_when( #unimproved floor when earth,sand,clay,mud, dung or other
+    (DWE04==1 | DWE04==2 | DWE04==6) ~ 0, TRUE ~ 1 )
+  ) %>%
+  mutate(dwe03_cat=case_when( #unimproved roof all options except metal,wood,ceramic tiles, cement, roofing shingles/sheets
+    (DWE03==2 |DWE03==3 | DWE03==4 | DWE03==6 |
+       DWE03==8 | DWE03==9 ) ~ 1 , TRUE ~ 0)
+  ) %>%
+  mutate(dwe02_cat=case_when( #improved wall: cement,stone,bricks,cement blocks, covered adobe, wood planks
+    (DWE02==2| DWE02==3|DWE02==4 | DWE02==5 | DWE02==6 ) ~ 1,
+    TRUE ~ 0)
+  ) 
+
+
+####Calculate crowding index
+
+main_ETH$HM_COUNT <- as.numeric(main_ETH$HM_COUNT)
+
+main_ETH <- main_ETH %>%
+  
+  mutate(crowding=DWE05/HM_COUNT
+  ) %>%
+  mutate(dwe05_cat=case_when( ##if crowding < 3 
+    crowding <= 3 ~ 1, TRUE ~ 0)
+  )
+
+
+####Combine all shelter indicators 
+
+##dwe01_cat / dwe02_cat / dwe03_cat / dwe04_cat / dwe05_cat 
+
+
+main_ETH <- main_ETH  %>%
+  
+  mutate(outcome9_1=case_when(
+    dwe01_cat==0 | dwe02_cat==0 | dwe03_cat==0 | dwe04_cat==0 | dwe05_cat==0   ~ 0, 
+    dwe01_cat==1 & dwe02_cat==1 & dwe03_cat==1 & dwe04_cat==1 & dwe05_cat==1  ~ 1)
+  ) %>%
+  mutate( outcome9_1 = labelled(outcome9_1,
+                                labels = c(
+                                  "Yes" = 1,
+                                  "No" = 0
+                                ),
+                                label = "PoC living in habitable and affordable housing"))
+
+table(main_ETH$outcome9_1)
+
+
+
+
+###9.2 Proportion of PoC that have energy to ensure lighting
+##Module :LIGHT01-LIGHT03
+
+
+main_ETH <- main_ETH %>% 
+  mutate(outcome9_2=
+           case_when(LIGHT01==1 & (LIGHT02==1 |LIGHT02==3 | LIGHT02==5 | LIGHT02==6 
+                                   | LIGHT02==7 ) & 
+                       (LIGHT03!=0 | LIGHT03!=96 | LIGHT03!=98 ) ~ 1,
+                     TRUE ~ 0)
+  ) %>%
+  mutate( outcome9_2 = labelled(outcome9_2,
+                                labels = c(
+                                  "Yes" = 1,
+                                  "No" = 0
+                                ),
+                                label = "PoC that have energy to ensure lighting"))
+
+table(main_ETH$outcome9_2)
+table(main_ETH$LIGHT01)
+table(main_ETH$LIGHT02)
+table(main_ETH$LIGHT03)
+
+##10.1 Proportion of children 9mo-5years who have received measles vaccination
+##Module :MMR01-MMR04 ##  MICS TC.1.1 UNICEF calculates on the first dose received##
+
+
+
+##Children who had et least one dose of measles vaccination
+
+ind_ETH <- ind_ETH %>%
+  mutate(outcome10_1=case_when(
+    MMR03==1 ~ 1, MMR03==2  | MMR03==98 ~ 0)
+  ) %>%
+  mutate( outcome10_1 = labelled(outcome10_1,
+                                 labels = c(
+                                   "Yes" = 1,
+                                   "No" = 0
+                                 ),
+                                 label = "Children 9mo-5years who have received measles vaccination"))
+
+table(ind_ETH$outcome10_1)
+
+###10.2 Proportion of births attended by skilled health personnel
+##Module :BIR01-BIR04
+
+##If there are live births in the last 2 years
+
+
+####THERE ARE NO VALUES FOR BIR03 variable
+
+main_ETH <- main_ETH %>%
+  mutate(outcome10_2=case_when( 
+    (BIR01==1 | BIR02==1) & (BIR03==1 |BIR03==2 | BIR03==3 ) ~ 1,
+    (BIR01==1 | BIR02==1) & (BIR03==4 |BIR03==5 | BIR03==6 
+                             | BIR03==96| BIR03==98 | BIR03==99) ~ 0, 
+    TRUE ~ NA_real_)
+  ) %>%
+  mutate( outcome10_2 = labelled(outcome10_2,
+                                 labels = c(
+                                   "Yes" = 1,
+                                   "No" = 0
+                                 ),
+                                 label = "Births attended by skilled health personnel"))
+
+table(main_ETH$outcome10_2)
+
+
+###12.1 Proportion of PoC using at least basic drinking water services
+##Module :DWA01-DWA04
+
+###Improved drinking water resource that is accessible under 30 minutes in the last 30 days
+
+main_ETH <- main_ETH %>%
+  
+  mutate(time_DWA=case_when(
+    DWA03A==1~1, DWA03B==2~60)
+  ) %>%
+  mutate(time_tot=time_DWA*DWA03B
+  ) %>%
+  mutate(dwa_cond1=case_when( time_tot > 30 ~ 0, TRUE ~ 1) ##Accessible under 30 minutes
+  ) %>%
+  mutate(dwa_cond2=case_when(DWA01!=7 |DWA01!=9 |DWA01!= 13 | DWA01 != 96 |DWA01 !=98 ~ 1,
+                             TRUE ~ 0) ## protected source
+  ) %>%
+  mutate(dwa_cond3=case_when(DWA04==1 ~ 0, TRUE ~ 1) ## drinking water was available in the last 30 days
+  ) %>%
+  mutate(outcome12_1=case_when(
+    (dwa_cond1==1 & dwa_cond2==1 & dwa_cond3==1) ~ 1, TRUE ~ 0)
+  ) %>%
+  mutate(outcome12_1 = labelled(outcome12_1,
+                                labels = c(
+                                  "Yes" = 1,
+                                  "No" = 0
+                                ),
+                                label = "Access to drinking water"))
+
+table(main_ETH$outcome12_1)
+
+
+
+
+###12.2 Proportion of PoC with access to a safe household toilet
+##Module :TOI01-TOI05 ##MICS calculation WS3.1/WS3.4
+
+
+
+main_ETH <- main_ETH %>%
+  mutate(toi_cond1=case_when(TOI01==11 |TOI01==12 | TOI01==13 | TOI01==14 |TOI01==18 |
+                               TOI01==21 | TOI01==22 | TOI01==31 ~ 1,
+                             TOI01==23 | TOI01==41 | TOI01==51 | TOI01==85 | TOI01==96 ~ 0,
+                             TRUE ~ NA_real_)
+  ) %>%
+  mutate(toi_cond2=case_when(
+    TOI02==1 & (TOI03==5 |TOI03==96) ~ 0, #Unsafe disposal
+    TOI02==1 & (TOI03==1 |TOI03==2 |TOI03==3 |TOI03==4| TOI03==98 ) ~ 1, #safe
+    TOI02==2 ~ 0, TOI02==98 ~ 1, TRUE ~ NA_real_)
+  ) %>%
+  mutate(toi_cond3=case_when(
+    TOI05==1 ~ 0, TOI05==0 ~ 1) # HH sharing toilet with other HHs
+  ) %>%
+  
+  
+  ### improved sanitation facility / safely disposed in situ / not shared with other HHs
+  
+  mutate(outcome12_2=case_when(
+    toi_cond1==0 | toi_cond2==0 |toi_cond3==0 ~ 0,
+    TRUE ~ 1)
+  ) %>%
+  mutate(outcome12_2 = labelled(outcome12_2,
+                                labels = c(
+                                  "Yes" = 1,
+                                  "No" = 0
+                                ),
+                                label = "PoC with access to a safe household toilet"))
+
+table(main_ETH$outcome12_2)
+
+###13.1 Proportion of PoC with an account at a bank or other financial institution or with a mobile-money service provider
+##Module :BANK01-BANK05
+
+
+##include if the respondent has an account on their own/with someone else, ATM card, personal bank card
+##or personally used phone to send money (proxy)
+
+main_ETH <- main_ETH %>%
+  mutate(
+    outcome13_1 = case_when(
+      BANK01==1 | BANK02== 1 | BANK03==1 |BANK05==1 ~ 1,
+      BANK01==2 & BANK02==2 & BANK03==2 & BANK05==2 ~ 0,
+      TRUE ~ 0)
+  ) %>%
+  mutate(outcome13_1 = labelled(outcome13_1,
+                                labels = c(
+                                  "Yes" = 1,
+                                  "No" = 0
+                                ),
+                                label = "PoC with an account at a bank or other financial institution or 
+                            with a mobile-money service provider")
+  )
+
+table((main_ETH$outcome13_1))
+###13.2 Proportion of PoC who self-report positive changes in their income compared to previous year
+##Module :INC01
+
+###INC01 is different for V1 CAPI
+
+### Only calculate as positive if they responded 'more' 
+
+
+
+main_ETH <- main_ETH %>%
+  mutate(outcome13_2=case_when(
+    INC01==1 ~ 1,
+    INC01==2 |INC01==3 | INC01==4 ~ 0 ) 
+  ) %>%
+  mutate(outcome13_2 = labelled(outcome13_2,
+                                labels = c(
+                                  "Yes" = 1,
+                                  "No" = 0
+                                ),
+                                label = "PoC who self-report positive changes in their income compared
+                                to previous year")
+  )
+
+
+table((main_ETH$outcome13_2))
+###13.3 Proportion of PoC (working age) who are unemployed
+
+####Numerator: Those of working age who were not in employment, looked for employment in the past 30 days and were available to take up employment
+####Denominator: Those of working age in labour force
+
+main_ETH <- main_ETH %>%
+  mutate(employed=case_when(
+    UNEM01==1 ~ 1,
+    UNEM02==1 & UNEM07==3 ~ 1,
+    UNEM04==1 ~ 1,
+    UNEM02==1 & UNEM07==1 & (UNEM08==1 | UNEM08==2) ~ 1,
+    UNEM05==1 & UNEM06==3 ~ 1,
+    UNEM05==1 & (UNEM06==1 | UNEM06==2) & (UNEM08==1 | UNEM08==2) ~ 1,
+    TRUE ~ 0)
+  ) %>%
+  mutate(working_age=case_when(
+    R03 >= 15 & R03 <=59 ~ 1, TRUE ~ 0) #Check for working age for ETH
+  ) %>%
+  mutate(outcome13_3=case_when(
+    (employed==0 & working_age==1) ~ 1,
+    (employed==1 & working_age==1) ~ 0,
+    TRUE ~ NA_real_)
+  ) %>%
+  mutate(outcome13_3 = labelled(outcome13_3,
+                                labels = c(
+                                  "Yes" = 1,
+                                  "No" = 0
+                                ),
+                                label = "PoC (working age) who are unemployed")
+  )
+
+table(main_ETH$outcome13_3)
+
+###16.1 Proportion of PoC with secure tenure rights and/or property rights to housing and/or land
+##Module :DWE06-DWE07 & DWE10-DWE11
+
+
+####Questions are filtered for camp
+
+
+
+main_ETH <- main_ETH %>%
+  mutate(housing_cond1=case_when(
+    (DWE11==1 | DWE11==2 ) ~ 1, # likelihood of losing right for housing is unlikely
+    TRUE ~ 0)
+  ) %>%
+  mutate(housing_cond2=case_when(
+    DWE10==1 | DWE10==8 ~ 0, # have official documents to proof residency
+    DWE10==2 | DWE10==3 |  DWE10==4 | DWE10==5 | DWE10==6 ~ 1)
+  ) %>%
+  mutate(housing_cond3=case_when(
+    DWE06==10 | DWE07==10 |DWE06==96 | DWE07==96 | DWE06==98 | DWE07==98 ~ 0, # not un-owned or not squatting
+    TRUE ~ 1)
+  ) %>%
+  mutate(outcome16_1=case_when(
+    FILTER_CAMP==2 & (housing_cond1==1 & housing_cond2==1 & housing_cond3==1) ~ 1,
+    FILTER_CAMP==2 &(housing_cond1==0 | housing_cond2==0 | housing_cond3==0) ~ 0,
+    TRUE~ NA_real_)
+  ) %>%
+  mutate(outcome16_1=labelled(outcome16_1,
+                              labels=c(
+                                'Yes'=1,
+                                'No'=0
+                              ),
+                              label="PoC with secure tenure rights and/or property rights
+                             to housing and/or land"))
+
+table(main_ETH$DWE10)
+table(main_ETH$housing_cond1)
+table(main_ETH$housing_cond2)
+table(main_ETH$housing_cond3)
+table(main_ETH$outcome16_1)
+
+###16.2 Proportion of PoC covered by social protection floors/systems
+##Module :UNHCR Core Indicator Metadata	SPF01
+
+
+
+# If PoC has covered by at least one of the social protection floors/systems
+
+###For ETH question is not structured to ask for governments only
+main_ETH <- main_ETH %>%
+  mutate(outcome16_2=case_when(
+    SPF01B==1 |SPF01C==1 |SPF01D==1 |SPF01E==1 | SPF01F==1 | SPF01G==1 
+    | SPF01H==1 | SPF01I==1 ~ 1, 
+    TRUE ~ 0)
+  ) %>%
+  mutate(outcome16_2=labelled(outcome16_2,
+                              labels=c(
+                                'Yes'=1,
+                                'No'=0
+                              ),
+                              label="PoC covered by social protection floors/systems")) 
+table(main_ETH$outcome16_2)
