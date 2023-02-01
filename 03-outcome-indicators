@@ -76,7 +76,7 @@ ind_ETH <- ind_ETH %>%
       birthCertificate==1 ~ 1, 
     REG04A!=1 & REG04F!=1 & REG04G!=1 & REG04C!=1 & REG04E!=1 &
       birthCertificate!=1 ~ 0,
-    TRUE ~ NA_real_
+    TRUE ~ 0
   ))
 
 table(ind_ETH$document_under5)
@@ -98,7 +98,7 @@ ind_ETH <- ind_ETH %>%
       REG01E==1 |  REG01F==1  ~ 1, 
     REG01A!=1 & REG01B!=1 & REG01H!=1 & REG01I!=1 & REG01D!=1 &
       REG01E!=1 &  REG01F!=1 ~ 0,
-    TRUE ~ NA_real_) ##calculate outcome indicator by combining under 5 and above 5 responses
+    TRUE ~ 0) ##calculate outcome indicator by combining under 5 and above 5 responses
   ) %>%
   mutate(outcome1_3=case_when(
     (document_above5==1 | document_under5==1) ~ 1,  
@@ -112,7 +112,7 @@ ind_ETH <- ind_ETH %>%
                              label="PoCs with legally recognized documents"))
 
 table(ind_ETH$outcome1_3)
-
+table(ind_ETH$document_above5)
 table(ind_ETH$REG01A)
 table(ind_ETH$REG01B)
 table(ind_ETH$REG01H)
@@ -161,6 +161,10 @@ main_ETH <- main_ETH %>%
                              label="Poc who do not accept violence against women"
   ))
 table(main_ETH$outcome4_2)
+table(main_ETH$VAW01A)
+table(main_ETH$VAW01B)
+table(main_ETH$VAW01C)
+table(main_ETH$VAW01D)
 
 ###5.2 Proportion of children who participate in community-based child protection programmes
 ##Module :COMM01-COMM04
@@ -247,7 +251,7 @@ main_ETH$HM_COUNT <- as.numeric(main_ETH$HM_COUNT)
 
 main_ETH <- main_ETH %>%
   
-  mutate(crowding=DWE05/HM_COUNT
+  mutate(crowding=HM_COUNT/DWE05
   ) %>%
   mutate(dwe05_cat=case_when( ##if crowding < 3 
     crowding <= 3 ~ 1, TRUE ~ 0)
@@ -361,11 +365,9 @@ main_ETH <- main_ETH %>%
   ) %>%
   mutate(dwa_cond2=case_when(DWA01!=7 |DWA01!=9 |DWA01!= 13 | DWA01 != 96 |DWA01 !=98 ~ 1,
                              TRUE ~ 0) ## protected source
-  ) %>%
-  mutate(dwa_cond3=case_when(DWA04==1 ~ 0, TRUE ~ 1) ## drinking water was available in the last 30 days
-  ) %>%
+  )  %>%
   mutate(outcome12_1=case_when(
-    (dwa_cond1==1 & dwa_cond2==1 & dwa_cond3==1) ~ 1, TRUE ~ 0)
+    (dwa_cond1==1 & dwa_cond2==1 ) ~ 1, TRUE ~ 0)
   ) %>%
   mutate(outcome12_1 = labelled(outcome12_1,
                                 labels = c(
@@ -464,6 +466,8 @@ main_ETH <- main_ETH %>%
 
 
 table((main_ETH$outcome13_2))
+table(main_ETH$INC01)
+view(main_ETH$INC01)
 ###13.3 Proportion of PoC (working age) who are unemployed
 
 ####Numerator: Those of working age who were not in employment, looked for employment in the past 30 days and were available to take up employment
@@ -520,7 +524,7 @@ main_ETH <- main_ETH %>%
   ) %>%
   mutate(outcome16_1=case_when(
     FILTER_CAMP==2 & (housing_cond1==1 & housing_cond2==1 & housing_cond3==1) ~ 1,
-    FILTER_CAMP==2 &(housing_cond1==0 | housing_cond2==0 | housing_cond3==0) ~ 0,
+    FILTER_CAMP==2 & (housing_cond1==0 | housing_cond3==0) ~ 0,
     TRUE~ NA_real_)
   ) %>%
   mutate(outcome16_1=labelled(outcome16_1,
