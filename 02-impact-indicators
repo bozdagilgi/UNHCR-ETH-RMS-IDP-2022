@@ -38,21 +38,16 @@ table(main_ETH$dwe04_cat)
 
 main_ETH$HM_COUNT <- as.numeric(main_ETH$HM_COUNT)
 
-
-table(main_ETH$crowding)
-table(main_ETH$dwe05_cat)
-view(main_ETH$crowding)
-
-view(main_ETH$DWE05A)
-
-
-
-###uSE dwe05a for crowding calculation ()
+####Calculate crowding index
 
 main_ETH <- main_ETH %>%
+  
+  mutate(crowding=HM_COUNT/DWE05
+  ) %>%
   mutate(dwe05_cat=case_when( ##if crowding <= 3 
-    DWE05A <= 3 ~ 1, TRUE ~ 0)
+    crowding <= 3 ~ 1, TRUE ~ 0)
   )
+
 
 table(main_ETH$dwe05_cat)
 
@@ -83,8 +78,7 @@ table(main_ETH$shelter)
 
 main_ETH <- main_ETH %>% 
   mutate(electricity=
-           case_when(LIGHT01==1 & (LIGHT02==1 |LIGHT02==3 | LIGHT02==5 | LIGHT02==6 
-                                   | LIGHT02==7 ) & 
+           case_when(LIGHT01==1 &  
                        (LIGHT03!=0 | LIGHT03!=96 | LIGHT03!=98 ) ~ 1,
                      TRUE ~ 0)
   ) %>%
@@ -113,11 +107,9 @@ main_ETH <- main_ETH %>%
   ) %>%
   mutate(dwa_cond2=case_when(DWA01!=7 |DWA01!=9 |DWA01!= 13 | DWA01 != 96 |DWA01 !=98 ~ 1,
                              TRUE ~ 0) ## protected source
-  ) %>%
-  mutate(dwa_cond3=case_when(DWA04==1 ~ 0, TRUE ~ 1) ## drinking water was available in the last 30 days
-  ) %>%
+  )  %>%
   mutate(drinkingwater=case_when(
-    (dwa_cond1==1 & dwa_cond2==1 & dwa_cond3==1) ~ 1, TRUE ~ 0)
+    (dwa_cond1==1 & dwa_cond2==1 ) ~ 1, TRUE ~ 0)
   ) %>%
   mutate(drinkingwater = labelled(drinkingwater,
                                   labels = c(
@@ -203,7 +195,8 @@ table(main_ETH$impact2_3)
 main_ETH <- main_ETH %>%
   mutate(impact3_3=case_when(
     SAF01==1 | SAF01==2 ~ 1,
-    SAF01==3 | SAF01==4 | SAF01==98 ~ 0, SAF01==99 | SAF01==97~ NA_real_)
+    SAF01==3 | SAF01==4  ~ 0, 
+    SAF01==98 | SAF01==99 | SAF01==97~ NA_real_)
   ) %>% 
   mutate(impact3_3=labelled(impact3_3,
                             labels =c(
@@ -213,3 +206,4 @@ main_ETH <- main_ETH %>%
                             label="PoC feeling safe walking alone"))
 
 table(main_ETH$impact3_3)
+table(main_ETH$SAF01)
